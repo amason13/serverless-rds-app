@@ -4,6 +4,15 @@ Transform: AWS::Serverless-2016-10-31
 
 Description: Serverless Python Web App
 
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: serverless-python-web-app
+    Description: Serverless Python Web App
+    Author: Ashley Mason
+    ReadmeUrl: README.md
+    HomePageUrl: https://github.com/amason13/serverless-rds-app
+    SemanticVersion: 0.0.1
+
 Parameters:
   # These are the parameters that will be used to create the stack
   DBName:
