@@ -13,7 +13,8 @@ def lambda_handler(event, context):
     ### Get data from db
     if event['httpMethod']=='GET':
         # extract parameters
-        if 'id' in event['queryStringParameters']:
+
+        if event['queryStringParameters'] and 'id' in event['queryStringParameters']:
             id_ = int(event['queryStringParameters']['id'])
             sql = f" SELECT * from {TABLE_NAME} where id={id_} "
 

@@ -11,6 +11,9 @@ DATABASE_NAME = os.environ['DATABASE_NAME']
 DB_CLUSTER_ARN = os.environ['DB_CLUSTER_ARN']
 DB_CREDENTIALS_SECRETS_STORE_ARN = os.environ['DB_CREDENTIALS_SECRETS_STORE_ARN']
 
+# Create an RDS client
+rds_client = boto3.client('rds-data')
+
 #################################
 ##### Some useful functions #####
 #################################
@@ -51,7 +54,7 @@ def batch_execute_statement(sql, sql_parameter_sets):
     return response_object
 
 # execute GET sql statement using RDS serverless data api
-def execute_get_statement(sql, include_tippers=False):
+def execute_get_statement(sql):
     response = rds_client.execute_statement(
         secretArn=DB_CREDENTIALS_SECRETS_STORE_ARN,
         database=DATABASE_NAME,
@@ -64,8 +67,7 @@ def execute_get_statement(sql, include_tippers=False):
     rows = [[list(r.values())[0] for r in row] for row in response['records']]
     
     for i in range(len(rows)):
-        data.append(dict(zip(column_names, rows[i])))
-        
+        data.append(dict(zip(column_names, rows[i])))        
         
     response_object = {}
     response_object['isBase64Encoded']=False
@@ -75,6 +77,8 @@ def execute_get_statement(sql, include_tippers=False):
     response_object['headers']['Access-Control-Allow-Origin']='*'
     response_object['multiValueHeaders'] = {}
     response_object['body'] = json.dumps(data)
+    
+    return response_object
 
 def log_values(table_name, id_):
     # log what is being deleted

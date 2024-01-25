@@ -13,7 +13,7 @@ def lambda_handler(event, context):
     ### Get data from db
     if event['httpMethod']=='GET':
         # extract parameters
-        if 'id' in event['queryStringParameters']:
+        if event['queryStringParameters'] and 'id' in event['queryStringParameters']:
             id_ = int(event['queryStringParameters']['id'])
             sql = f" SELECT * from {TABLE_NAME} where id={id_} "
         else:
@@ -54,9 +54,7 @@ def lambda_handler(event, context):
         log_values(TABLE_NAME, id_)
 
         sql = f" DELETE from {TABLE_NAME} where id={id_} "
-        resp = execute_statement(sql)
-
-       return resp
+        return execute_statement(sql)
 
     else:
         response_object = {}

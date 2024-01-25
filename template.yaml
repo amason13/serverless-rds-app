@@ -51,7 +51,7 @@ Resources:
     Type: AWS::RDS::DBCluster
     Properties:
       DatabaseName: !Ref DBName
-      DBClusterIdentifier: my_db_cluster
+      DBClusterIdentifier: example-cluster
       Engine: aurora-mysql
       EngineVersion: 5.7.mysql_aurora.2.11.3
       EngineMode: serverless 
@@ -103,7 +103,7 @@ Resources:
   DBCreateTables:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/db_create_tables/
+      CodeUri: functions/db_create_tables/
       Policies:
         - AmazonRDSDataFullAccess # need to make this more specific
         - Version: '2012-10-17'
@@ -116,7 +116,7 @@ Resources:
   People:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/people/
+      CodeUri: functions/people/
       Policies:
         - AmazonRDSDataFullAccess # need to make this more specific
         - Version: '2012-10-17'
@@ -129,7 +129,7 @@ Resources:
   Companies:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: lambdas/companies/
+      CodeUri: functions/companies/
       Policies:
         - AmazonRDSDataFullAccess # need to make this more specific
         - Version: '2012-10-17'

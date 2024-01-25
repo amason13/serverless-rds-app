@@ -1,0 +1,10 @@
+version = 0.1
+[default.deploy.parameters]
+stack_name = "my-serverless-app"
+resolve_s3 = true
+s3_prefix = "my-serverless-app"
+region = "eu-west-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "DBName=\"my_database_name\""
+image_repositories = []
