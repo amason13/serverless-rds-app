@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime, timedelta
 
+
 # Import environment variables here - as set up in template.yaml file
 # we can call them once here and don't need to call them in each function
 S3_BUCKET = os.environ['S3_BUCKET']

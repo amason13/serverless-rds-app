@@ -1,0 +1,607 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: serverless-rds-python-app
+    Description: Serverless App with RDS aurora database. To be used as backend web
+      app connecting through API gateway->lambda->rds through data API.
+    Author: Ashley Mason
+    ReadmeUrl: s3://amason13-serverless-app-repo/0cf7ec60f47729b7cdfb237696fdbcc4
+    HomePageUrl: https://github.com/amason13/serverless-rds-app
+    SourceCodeUrl: https://github.com/amason13/serverless-rds-app
+    SemanticVersion: '0.0.1'
+Description: Serverless App with RDS aurora database. To be used as backend web app
+  connecting through API gateway->lambda->rds through data API.
+Parameters:
+  DBName:
+    Default: my_database_name
+    Type: String
+Globals:
+  Function:
+    Runtime: python3.9
+    Handler: app.lambda_handler
+    Timeout: 150
+    Layers:
+    - Ref: Helpers
+    - Ref: RequestsLayer
+    Environment:
+      Variables:
+        S3_BUCKET:
+          Ref: MyS3Bucket
+        DATABASE_NAME:
+          Ref: DBName
+        DB_CLUSTER_ARN:
+          Fn::GetAtt:
+          - MyDBCluster
+          - DBClusterArn
+        DB_CREDENTIALS_SECRETS_STORE_ARN:
+          Ref: SecretRDSAttachment
+Outputs:
+  APIEndpoint:
+    Description: API Prod stage endpoint
+    Value:
+      Fn::Sub: https://${MyAPI}.execute-api.${AWS::Region}.amazonaws.com/prod/
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Metadata:
+      SamResourceId: MyS3Bucket
+  MyDBCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DatabaseName:
+        Ref: DBName
+      DBClusterIdentifier: example-cluster
+      Engine: aurora-mysql
+      EngineVersion: 5.7.mysql_aurora.2.11.3
+      EngineMode: serverless
+      EnableHttpEndpoint: true
+      MasterUsername:
+        Fn::Sub: '{{resolve:secretsmanager:${DBCredentialsSecret}::username}}'
+      MasterUserPassword:
+        Fn::Sub: '{{resolve:secretsmanager:${DBCredentialsSecret}::password}}'
+      ScalingConfiguration:
+        MinCapacity: 1
+        MaxCapacity: 64
+        AutoPause: false
+    Metadata:
+      SamResourceId: MyDBCluster
+  DBCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      SecretString: '{"username":"admin","password":"Password123!"}'
+    Metadata:
+      SamResourceId: DBCredentialsSecret
+  SecretRDSAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId:
+        Ref: DBCredentialsSecret
+      TargetId:
+        Ref: MyDBCluster
+      TargetType: AWS::RDS::DBCluster
+    Metadata:
+      SamResourceId: SecretRDSAttachment
+  Helpers:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: s3://amason13-serverless-app-repo/e3940725783b83142c5117b52be89817
+      CompatibleRuntimes:
+      - python3.9
+      - python3.10
+    Metadata:
+      SamResourceId: Helpers
+  RequestsLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: s3://amason13-serverless-app-repo/19f0c6334f21ac4598fc837942528c0c
+      CompatibleRuntimes:
+      - python3.9
+      - python3.10
+    Metadata:
+      SamResourceId: RequestsLayer
+  DBCreateTables:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://amason13-serverless-app-repo/c0ee29d7049e0f666a5472bc664f7430
+      Policies:
+      - AmazonRDSDataFullAccess
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - secretsmanager:GetSecretValue
+          Resource:
+            Ref: SecretRDSAttachment
+    Metadata:
+      SamResourceId: DBCreateTables
+  People:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://amason13-serverless-app-repo/08ee21ec80b0d62c1321c3ce0284c6f5
+      Policies:
+      - AmazonRDSDataFullAccess
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - secretsmanager:GetSecretValue
+          Resource:
+            Ref: SecretRDSAttachment
+    Metadata:
+      SamResourceId: People
+  Companies:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://amason13-serverless-app-repo/5ffa99c26d5c5971ed393284e4ee636f
+      Policies:
+      - AmazonRDSDataFullAccess
+      - Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - secretsmanager:GetSecretValue
+          Resource:
+            Ref: SecretRDSAttachment
+    Metadata:
+      SamResourceId: Companies
+  MyApiInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: apigateway.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: InvokeLambda
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource: '*'
+    Metadata:
+      SamResourceId: MyApiInvokeRole
+  MyAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      Auth:
+        DefaultAuthorizer: None
+      StageName: prod
+      DefinitionBody:
+        openapi: 3.0.1
+        info:
+          title: MyAPI
+        paths:
+          /people:
+            get:
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${People.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            post:
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/peoplePost'
+                required: true
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-request-validator: Validate body
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${People.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            put:
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/peoplePut'
+                required: true
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-request-validator: Validate body
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${People.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            delete:
+              parameters:
+              - name: id
+                in: query
+                required: true
+                schema:
+                  type: integer
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-request-validator: Validate query string parameters
+                and headers
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${People.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            options:
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              x-amazon-apigateway-integration:
+                type: mock
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '''DELETE,GET,OPTIONS,POST,PUT'''
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                passthroughBehavior: when_no_match
+          /companies:
+            get:
+              parameters:
+              - name: id
+                in: query
+                required: false
+                schema:
+                  type: integer
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Companies.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            post:
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/companiesPost'
+                required: true
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-request-validator: Validate body
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Companies.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            put:
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/companiesPut'
+                required: true
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-request-validator: Validate body
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Companies.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            delete:
+              parameters:
+              - name: id
+                in: query
+                required: true
+                schema:
+                  type: integer
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              security:
+              - CognitoAuthorizer: []
+              x-amazon-apigateway-request-validator: Validate query string parameters
+                and headers
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri:
+                  Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Companies.Arn}/invocations
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                credentials:
+                  Fn::GetAtt:
+                  - MyApiInvokeRole
+                  - Arn
+            options:
+              responses:
+                '200':
+                  description: 200 response
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+                  content:
+                    application/json:
+                      schema:
+                        $ref: '#/components/schemas/Empty'
+              x-amazon-apigateway-integration:
+                type: mock
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: '''DELETE,GET,OPTIONS,POST,PUT'''
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                passthroughBehavior: when_no_match
+        components:
+          schemas:
+            Empty:
+              title: Empty Schema
+              type: object
+            peoplePost:
+              title: Add New People Events Schema
+              required:
+              - first
+              - last
+              - email
+              - phone
+              - dob
+              type: object
+              properties:
+                first:
+                  type: string
+                last:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                dob:
+                  type: string
+            peoplePut:
+              title: Edit Existing People Events Schema
+              required:
+              - id
+              - first
+              - last
+              - email
+              - phone
+              - dob
+              type: object
+              properties:
+                id:
+                  type: integer
+                first:
+                  type: string
+                last:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                dob:
+                  type: string
+            companiesPost:
+              title: Add New Company Events Schema
+              required:
+              - name
+              type: object
+              properties:
+                name:
+                  type: string
+            companiesPut:
+              title: Edit Existing Company Events Schema
+              required:
+              - id
+              - name
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+        x-amazon-apigateway-request-validators:
+          Validate body:
+            validateRequestParameters: false
+            validateRequestBody: true
+          Validate query string parameters and headers:
+            validateRequestParameters: true
+            validateRequestBody: false
+    Metadata:
+      SamResourceId: MyAPI

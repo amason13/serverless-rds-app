@@ -2,16 +2,17 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
-Description: Serverless Python Web App
-
 Metadata:
   AWS::ServerlessRepo::Application:
-    Name: serverless-python-web-app
-    Description: Serverless Python Web App
+    Name: serverless-rds-python-app
+    Description: Serverless App with RDS aurora database. To be used as backend web app connecting through API gateway->lambda->rds through data API.
     Author: Ashley Mason
     ReadmeUrl: README.md
     HomePageUrl: https://github.com/amason13/serverless-rds-app
-    SemanticVersion: 0.0.1
+    SourceCodeUrl: https://github.com/amason13/serverless-rds-app
+    # SemanticVersion: 0.0.1
+
+Description: Serverless App with RDS aurora database. To be used as backend web app connecting through API gateway->lambda->rds through data API.
 
 Parameters:
   # These are the parameters that will be used to create the stack
@@ -27,19 +28,19 @@ Globals:
   Function:
     Runtime: python3.9 # set the runtime for all functions
     Handler: app.lambda_handler # set the handler for all functions
-    Timeout: 180
+    Timeout: 150
     Layers:
-     - !Ref Helpers # refers to the lambda layer we create below in resources
-     - !Ref RequestsLayer # refers to the lambda layer we create below in resources
+     - !Ref Helpers 
+     - !Ref RequestsLayer 
     Environment:
       Variables:
         # These are the environment variables that will be available to all functions
         # I've set it up so that they are all called from the helpers layer
         # so we don't need to define them in each function
-        S3_BUCKET: !Ref MyS3Bucket # refers to the S3 bucket we create below in resources
-        DATABASE_NAME: !Ref DBName # refers to the database name we pass in as a parameter
-        DB_CLUSTER_ARN: !GetAtt   MyDBCluster.DBClusterArn # refers to the DB cluster we create below in resources
-        DB_CREDENTIALS_SECRETS_STORE_ARN: !Ref SecretRDSAttachment # refers to the secret we create below in resources
+        S3_BUCKET: !Ref MyS3Bucket 
+        DATABASE_NAME: !Ref DBName 
+        DB_CLUSTER_ARN: !GetAtt   MyDBCluster.DBClusterArn 
+        DB_CREDENTIALS_SECRETS_STORE_ARN: !Ref SecretRDSAttachment 
 
 Outputs:
   APIEndpoint:

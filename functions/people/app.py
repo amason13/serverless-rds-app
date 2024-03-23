@@ -6,6 +6,7 @@ import requests
 TABLE_NAME = 'people'
 
 def lambda_handler(event, context):
+    
     # logging
     print('event:')
     print(event)

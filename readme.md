@@ -20,3 +20,12 @@ In the terminal:
     - sam build
 3. Deploy the app
     - sam deploy --guided
+    - enter your desired parameters
+
+## Let's look at the resources created
+1. Navigate to your newly created 'create_db_tables' lambda function and run it to create the tables in your database
+2. Navigate to your api gateway to test your newly created APIs
+
+## Notes
+- Hopefully you can use this as a basis to create your own serverless app with rds backend
+- Build out your API, add security features etc. to interface with the front end of your app.
